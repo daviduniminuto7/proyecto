@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prototipo juego</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            background-color: #333;
+            margin: 0;
+            overflow: hidden;
+            height: 100vh;
+        }
+        #scoreBoard {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            color: #ffffff;
+            font-size: 20px;
+            font-family: Arial, sans-serif;
+            z-index: 1000;
+        }
+        canvas {
+            background-color: #222;
+            margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div id="scoreBoard">Score: 0</div>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreBoard = document.getElementById('scoreBoard');
+
+        // Ajustar el tamaño del canvas para que sea responsive
+        function resizeCanvas() {
+            canvas.width = window.innerWidth * 0.9;  // Ocupa el 90% del ancho de la pantalla
+            canvas.height = window.innerHeight * 0.6; // Ocupa el 60% de la altura de la pantalla
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas(); // Llamar al inicio para configurar el tamaño inicial del canvas
+
+        let player = {
+            x: 50,
+            y: canvas.height - 70,
+            width: 30,
+            height: 30,
+            color: "#ffcc00",
+            dy: 0,
+            gravity: 0.5,
+            jump: -16,
+            grounded: false
+        };
+
+        let obstacles = [];
+        let spikes = [];
+        let platforms = [];
+        let frames = 0;
+        let score = 0;
+        let gameSpeed = 2;
+        
+        let coyoteTime = 0.1;
+        let coyoteTimeCounter = 0;
+
+        function drawPlayer() {
+            ctx.fillStyle = player.color;
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+        }
+
+        function createObstacle() {
+            let obstacleHeight = Math.floor(Math.random() * 100) + 20;
+            let obstacleY = canvas.height - obstacleHeight;
+            let verticalObstacle = {
+                x: canvas.width,
+                y: obstacleY,
+                width: 20,
+                height: obstacleHeight,
+                color: "#ff3300",
+                type: 'vertical'
+            };
+            obstacles.push(verticalObstacle);
+
+            let horizontalObstacle = {
+                x: canvas.width + Math.floor(Math.random() * 200),
+                y: Math.random() * (canvas.height - 100),
+                width: 60,
+                height: 20,
+                color: "#33ccff",
+                type: 'static'
+            };
+            obstacles.push(horizontalObstacle);
+
+            let spike = {
+                x: canvas.width,
+                y: canvas.height - 10,
+                width: 30,
+                height: 10,
+                color: "#ff0000"
+            };
+            spikes.push(spike);
+
+            let platform = {
+                x: canvas.width + 100,
+                y: canvas.height - 150,
+                width: 80,
+                height: 10,
+                color: "#00ff00"
+            };
+            platforms.push(platform);
+        }
+
+        function drawObstacles() {
+            obstacles.forEach((obstacle, index) => {
+                ctx.fillStyle = obstacle.color;
+                ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+
+                if (obstacle.type === 'vertical') {
+                    obstacle.x -= gameSpeed;
+                } else if (obstacle.type === 'static') {
+                    obstacle.x -= gameSpeed;
+                }
+
+                if (obstacle.x + obstacle.width < 0) {
+                    obstacles.splice(index, 1);
+                    score++;
+                }
+
+                if (player.x < obstacle.x + obstacle.width &&
+                    player.x + player.width > obstacle.x &&
+                    player.y < obstacle.y + obstacle.height &&
+                    player.y + player.height > obstacle.y) {
+                    alert("Game Over! Score: " + score);
+                    resetGame();
+                }
+            });
+        }
+
+        function drawSpikes() {
+            spikes.forEach((spike, index) => {
+                ctx.fillStyle = spike.color;
+                ctx.fillRect(spike.x, spike.y, spike.width, spike.height);
+                spike.x -= gameSpeed;
+
+                if (spike.x + spike.width < 0) {
+                    spikes.splice(index, 1);
+                }
+
+                if (player.x < spike.x + spike.width &&
+                    player.x + player.width > spike.x &&
+                    player.y < spike.y + spike.height &&
+                    player.y + player.height > spike.y) {
+                    alert("Game Over! Score: " + score);
+                    resetGame();
+                }
+            });
+        }
+
+        function drawPlatforms() {
+            platforms.forEach((platform, index) => {
+                ctx.fillStyle = platform.color;
+                ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+                platform.x -= gameSpeed;
+
+                if (platform.x + platform.width < 0) {
+                    platforms.splice(index, 1);
+                }
+
+                if (player.x < platform.x + platform.width &&
+                    player.x + player.width > platform.x &&
+                    player.y + player.height <= platform.y &&
+                    player.y + player.height + player.dy >= platform.y) {
+                    player.grounded = true;
+                    player.dy = 0;
+                    player.y = platform.y - player.height;
+                }
+            });
+        }
+
+        function resetGame() {
+            player.y = canvas.height - 70;
+            player.dy = 0;
+            obstacles = [];
+            spikes = [];
+            platforms = [];
+            score = 0;
+            gameSpeed = 2;
+        }
+
+        function updatePlayer() {
+            if (!player.grounded) {
+                player.dy += player.gravity;
+                coyoteTimeCounter -= 1 / 60;
+            } else {
+                coyoteTimeCounter = coyoteTime;
+            }
+            player.y += player.dy;
+
+            if (player.y + player.height > canvas.height) {
+                player.y = canvas.height - player.height;
+                player.grounded = true;
+                player.dy = 0;
+            } else {
+                player.grounded = false;
+            }
+        }
+
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            drawPlayer();
+            updatePlayer();
+            drawObstacles();
+            drawSpikes();
+            drawPlatforms();
+
+            frames++;
+            if (frames % 100 === 0) {
+                createObstacle();
+            }
+
+            scoreBoard.innerText = `Score: ${score}`;
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Evento de toque para dispositivos móviles y clic para desktop
+        function jump() {
+            if (player.grounded || coyoteTimeCounter > 0) {
+                player.dy = player.jump;
+                player.grounded = false;
+                coyoteTimeCounter = 0;
+            }
+        }
+
+        window.addEventListener('mousedown', jump);       // Para computadoras
+        window.addEventListener('touchstart', jump);      // Para dispositivos táctiles
+
+        gameLoop();
+    </script>
+</body>
+</html>
